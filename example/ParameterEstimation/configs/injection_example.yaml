@@ -1,6 +1,6 @@
 # Book keeping parameters
 
-output_path: /mnt/home/wwong/ceph/GWProject/JaxGW/RealtimePE/ppPlots/injection_1
+output_path: /Users/thomasedwards/Dropbox/Work/Gravitational_Waves/JaxGW/plots
 downsample_factor: 10
 
 # Noise parameters

@@ -1,0 +1,23 @@
+# Book keeping parameters
+
+output_path: /Users/thomasedwards/Dropbox/Work/Gravitational_Waves/JaxGW/plots
+
+# Noise parameters
+
+f_sampling: 1024
+duration: 16
+fmin: 20
+ifos:
+  - H1
+  - L1
+  - V1
+
+# Injection parameters
+
+Nt: 2000
+mmin: 20.
+mmax: 60.
+chimin: -0.8
+chimax: 0.8
+distmin: 600
+distmax: 900
