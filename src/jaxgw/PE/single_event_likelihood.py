@@ -29,5 +29,5 @@ def single_detector_likelihood(
     )
     match_filter_SNR = inner_product(waveform, data, data_f, PSD)
     optimal_SNR = inner_product(waveform, waveform, data_f, PSD)
-    return (-2 * match_filter_SNR + optimal_SNR) / 2
+    return match_filter_SNR - optimal_SNR / 2
 

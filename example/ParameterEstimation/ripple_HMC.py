@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # from functools import partial
 
 # Import FlowMC stuff
-# from flowMC.sampler.HMC import HMC
+from flowMC.sampler.HMC import HMC
 from flowMC.sampler.MALA import MALA
 from flowMC.nfmodel.rqSpline import RQSpline
 from flowMC.sampler.Sampler import Sampler
@@ -59,8 +59,9 @@ gmst = GreenwichMeanSiderealTime(trigger_time)
 m1 = 30
 m2 = 25
 Mc, eta = ms_to_Mc_eta(jnp.array([m1, m2]))
+distance = 1600
 true_params = jnp.array(
-    [Mc, eta, 0.3, -0.4, 800, 0.0, 0.0, np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3]
+    [Mc, eta, 0.3, -0.4, distance, 0.0, 0.0, np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3]
 )
 
 # We now can generate data
@@ -85,7 +86,7 @@ L1_data = L1_noise_psd + L1_signal
 def logL(p):
     # Adding on the true ones
     extrinsic_variables = jnp.array(
-        [1600, 0.0, 0.0, np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3]
+        [np.pi / 1.2, np.pi / 3.245, np.pi / 2, np.pi / 4.25]
     )
     params = jnp.concatenate((p, extrinsic_variables))
     logL_H1 = single_detector_likelihood(
@@ -101,8 +102,11 @@ prior_range = jnp.array(
     [
         [10, 80],
         [0.09, 0.25],
-        [0, 1],
-        [0, 1]
+        [-1, 1],
+        [-1, 1],
+        [400,2000],
+        [-0.1, 0.1],
+        [0, 2*np.pi],
     ]
 )
 
@@ -123,11 +127,11 @@ def posterior(theta):
 
 
 
-n_dim = 4
+n_dim = 7
 n_chains = 5
-n_local_steps = 30000
+n_local_steps = 3000
 n_global_steps = 30
-step_size = 1
+step_size = 0.01
 n_loop_training = 2
 n_loop_production = 1
 n_leapfrog = 5
@@ -136,8 +140,8 @@ true_params = jnp.array([Mc, eta, 0.3, -0.4])
 rng_key_set = initialize_rng_keys(n_chains, seed=41)
 
 initial_noise = jax.random.normal(rng_key_set[0], shape=(n_chains, n_dim)) * 1
-initial_mean = jnp.array([Mc, eta, 0.3, -0.4]).reshape(1,4)
-sigma = jnp.array([0.01, 0.001, 0.01, 0.01]).reshape(1,4)
+initial_mean = jnp.array([Mc, eta, 0.3, -0.4, distance, 0, 0]).reshape(1,7)
+sigma = jnp.array([0.01, 0.001, 0.01, 0.01, 10, 0.01, 0.01]).reshape(1,7)
 
 initial_position = initial_mean + sigma * initial_noise
 
@@ -148,17 +152,17 @@ mass_matrix = jax.vmap(mass_diag)(initial_position)
 mass_matrix = jnp.array(mass_matrix).mean(axis=0)
 
 
-# HMC_init = HMC(
-#     logL,
-#     True,
-#     {
-#         "step_size": step_size,
-#         "n_leapfrog": n_leapfrog,
-#         "inverse_metric": mass_matrix,
-#     },
-# )
+local_sampler = HMC(
+    logL,
+    True,
+    {
+        "step_size": step_size,
+        "n_leapfrog": n_leapfrog,
+        "inverse_metric": mass_matrix,
+    },
+)
 
-MALA_init = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
+# local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
 
 
 model = RQSpline(n_dim, 4, [32, 32], 8)
@@ -168,7 +172,7 @@ print("Initializing sampler class")
 nf_sampler = Sampler(
     n_dim,
     rng_key_set,
-    MALA_init,
+    local_sampler,
     posterior,
     model,
     n_loop_training=n_loop_training,
