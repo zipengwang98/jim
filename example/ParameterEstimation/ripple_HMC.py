@@ -31,12 +31,8 @@ import jax.numpy as jnp
 
 # Detector Setup
 
-f_sampling: 2048
-duration: 8
-fmin: 20
-
-f_sampling = 1024
-duration = 16
+f_sampling = 2048
+duration = 4
 fmin = 20
 ifos = ["H1", "L1", "V1"]
 
@@ -49,7 +45,7 @@ V1 = get_V1()
 
 f_ref = fmin
 trigger_time = 1126259462.4
-post_trigger_duration = 4
+post_trigger_duration = 2
 epoch = duration - post_trigger_duration
 gmst = GreenwichMeanSiderealTime(trigger_time)
 
@@ -86,7 +82,7 @@ L1_data = L1_noise_psd + L1_signal
 def logL(p):
     # Adding on the true ones
     extrinsic_variables = jnp.array(
-        [np.pi / 1.2, np.pi / 3.245, np.pi / 2, np.pi / 4.25]
+        [np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3]
     )
     params = jnp.concatenate((p, extrinsic_variables))
     logL_H1 = single_detector_likelihood(
@@ -128,22 +124,25 @@ def posterior(theta):
 
 
 n_dim = 7
-n_chains = 5
-n_local_steps = 3000
-n_global_steps = 30
-step_size = 0.01
-n_loop_training = 2
-n_loop_production = 1
-n_leapfrog = 5
+n_chains = 30
+n_local_steps = 300
+n_global_steps = 300
+step_size = 0.3
+n_loop_training = 5
+n_loop_production = 5
+n_leapfrog = 10
 
 true_params = jnp.array([Mc, eta, 0.3, -0.4])
 rng_key_set = initialize_rng_keys(n_chains, seed=41)
 
 initial_noise = jax.random.normal(rng_key_set[0], shape=(n_chains, n_dim)) * 1
-initial_mean = jnp.array([Mc, eta, 0.3, -0.4, distance, 0, 0]).reshape(1,7)
-sigma = jnp.array([0.01, 0.001, 0.01, 0.01, 10, 0.01, 0.01]).reshape(1,7)
+initial_mean = jnp.array([Mc, eta, 0.3, -0.4, distance, 0, 0. ]).reshape(1,7)
+sigma = jnp.array([1, 0.001, 0.1, 0.1, 10, 0.001, 0.01]).reshape(1,7)
 
-initial_position = initial_mean + sigma * initial_noise
+initial_position = np.array(initial_mean + sigma * initial_noise)
+initial_position[initial_position[:,1]>0.25,1] = 0.25
+initial_position[initial_position[:,6]<0.,6] = 0.0
+initial_position = jnp.array(initial_position)
 
 mass_diag = lambda x: jnp.abs(1./(jax.grad(logL)(x)+jax.grad(top_hat)(x)))
 
@@ -152,17 +151,17 @@ mass_matrix = jax.vmap(mass_diag)(initial_position)
 mass_matrix = jnp.array(mass_matrix).mean(axis=0)
 
 
-local_sampler = HMC(
-    logL,
-    True,
-    {
-        "step_size": step_size,
-        "n_leapfrog": n_leapfrog,
-        "inverse_metric": mass_matrix,
-    },
-)
+# local_sampler = HMC(
+#     logL,
+#     True,
+#     {
+#         "step_size": step_size,
+#         "n_leapfrog": n_leapfrog,
+#         "inverse_metric": mass_matrix,
+#     },
+# )
 
-# local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
+local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
 
 
 model = RQSpline(n_dim, 4, [32, 32], 8)
@@ -180,7 +179,7 @@ nf_sampler = Sampler(
     n_local_steps=n_local_steps,
     n_global_steps=n_global_steps,
     n_chains=n_chains,
-    use_global=False,
+    use_global=True,
 )
 
 nf_sampler.sample(initial_position)
