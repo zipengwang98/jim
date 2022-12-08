@@ -124,13 +124,13 @@ def posterior(theta):
 
 
 n_dim = 7
-n_chains = 5
+n_chains = 30
 n_local_steps = 300
 n_global_steps = 300
-step_size = 0.1
+step_size = 0.3
 n_loop_training = 5
-n_loop_production = 1
-n_leapfrog = 20
+n_loop_production = 5
+n_leapfrog = 10
 
 true_params = jnp.array([Mc, eta, 0.3, -0.4])
 rng_key_set = initialize_rng_keys(n_chains, seed=41)
@@ -149,22 +149,19 @@ mass_diag = lambda x: jnp.abs(1./(jax.grad(logL)(x)+jax.grad(top_hat)(x)))
 mass_matrix = np.eye(n_dim)
 mass_matrix = jax.vmap(mass_diag)(initial_position)
 mass_matrix = jnp.array(mass_matrix).mean(axis=0)
-mass_matrix = mass_matrix.at[1].set(mass_matrix[1]/1000)
-mass_matrix = mass_matrix.at[5].set(mass_matrix[5]/10)
-mass_matrix = mass_matrix.at[6].set(mass_matrix[6]/10)
 
 
-local_sampler = HMC(
-    logL,
-    True,
-    {
-        "step_size": step_size,
-        "n_leapfrog": n_leapfrog,
-        "inverse_metric": mass_matrix,
-    },
-)
+# local_sampler = HMC(
+#     logL,
+#     True,
+#     {
+#         "step_size": step_size,
+#         "n_leapfrog": n_leapfrog,
+#         "inverse_metric": mass_matrix,
+#     },
+# )
 
-# local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
+local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
 
 
 model = RQSpline(n_dim, 4, [32, 32], 8)
@@ -182,7 +179,7 @@ nf_sampler = Sampler(
     n_local_steps=n_local_steps,
     n_global_steps=n_global_steps,
     n_chains=n_chains,
-    use_global=False,
+    use_global=True,
 )
 
 nf_sampler.sample(initial_position)
