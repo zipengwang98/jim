@@ -125,8 +125,8 @@ def posterior(theta):
 
 n_dim = 7
 n_chains = 5
-n_local_steps = 300
-n_global_steps = 300
+n_local_steps = 10000
+n_global_steps = 10000
 step_size = 0.1
 n_loop_training = 5
 n_loop_production = 1
@@ -150,7 +150,7 @@ mass_matrix = np.eye(n_dim)
 mass_matrix = jax.vmap(mass_diag)(initial_position)
 mass_matrix = jnp.array(mass_matrix).mean(axis=0)
 mass_matrix = mass_matrix.at[1].set(mass_matrix[1]/1000)
-mass_matrix = mass_matrix.at[5].set(mass_matrix[5]/10)
+mass_matrix = mass_matrix.at[5].set(mass_matrix[5]/100)
 mass_matrix = mass_matrix.at[6].set(mass_matrix[6]/10)
 
 
