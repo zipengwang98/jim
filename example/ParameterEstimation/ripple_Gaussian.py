@@ -14,8 +14,7 @@ import matplotlib.pyplot as plt
 # from functools import partial
 
 # Import FlowMC stuff
-from flowMC.sampler.HMC import HMC
-from flowMC.sampler.MALA import MALA
+from flowMC.sampler.Gaussian_random_walk import GaussianRandomWalk
 from flowMC.nfmodel.rqSpline import RQSpline
 from flowMC.sampler.Sampler import Sampler
 from flowMC.utils.PRNG_keys import initialize_rng_keys
@@ -154,18 +153,13 @@ mass_matrix = mass_matrix.at[5].set(mass_matrix[5]/100)
 mass_matrix = mass_matrix.at[6].set(mass_matrix[6]/10)
 
 
-local_sampler = HMC(
+local_sampler = GaussianRandomWalk(
     posterior,
     True,
     {
         "step_size": step_size,
-        "n_leapfrog": n_leapfrog,
-        "inverse_metric": mass_matrix,
     },
 )
-
-# local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
-
 
 model = RQSpline(n_dim, 4, [32, 32], 8)
 
