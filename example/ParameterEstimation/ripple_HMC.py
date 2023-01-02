@@ -124,13 +124,13 @@ def posterior(theta):
 
 
 n_dim = 7
-n_chains = 5
-n_local_steps = 10000
-n_global_steps = 10000
+n_chains = 4
+n_local_steps = 200000
+n_global_steps = 50000
 step_size = 0.1
 n_loop_training = 5
 n_loop_production = 1
-n_leapfrog = 20
+n_leapfrog = 10
 
 true_params = jnp.array([Mc, eta, 0.3, -0.4])
 rng_key_set = initialize_rng_keys(n_chains, seed=41)
@@ -188,3 +188,11 @@ nf_sampler = Sampler(
 nf_sampler.sample(initial_position)
 
 chains, log_prob, local_accs, global_accs = nf_sampler.get_sampler_state().values()
+
+np.savez(
+    "chains.npz",
+    chains=chains,
+    log_prob=log_prob,
+    local_accs=local_accs,
+    global_accs=global_accs,
+)
