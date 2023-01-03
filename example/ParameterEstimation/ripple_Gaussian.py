@@ -124,7 +124,7 @@ def posterior(theta):
 
 n_dim = 7
 n_chains = 4
-n_local_steps = 500000
+n_local_steps = 1500000
 n_global_steps = 50000
 step_size = 0.01
 n_loop_training = 5
@@ -146,7 +146,7 @@ initial_position = jnp.array(initial_position)
 mass_diag = lambda x: jnp.abs(1./(jax.grad(logL)(x)+jax.grad(top_hat)(x)))
 
 mass_matrix = jnp.array(np.ones(n_dim))
-mass_matrix = mass_matrix.at[1].set(mass_matrix[1]/1000)
+mass_matrix = mass_matrix.at[1].set(mass_matrix[1]/300)
 mass_matrix = mass_matrix.at[4].set(mass_matrix[4]*100)
 mass_matrix = mass_matrix.at[5].set(mass_matrix[5]/100)
 mass_matrix = mass_matrix.at[6].set(mass_matrix[6]/10)
