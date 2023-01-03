@@ -124,9 +124,9 @@ def posterior(theta):
 
 n_dim = 7
 n_chains = 4
-n_local_steps = 200000
+n_local_steps = 500000
 n_global_steps = 50000
-step_size = 0.1
+step_size = 0.01
 n_loop_training = 5
 n_loop_production = 1
 n_leapfrog = 10
@@ -145,19 +145,18 @@ initial_position = jnp.array(initial_position)
 
 mass_diag = lambda x: jnp.abs(1./(jax.grad(logL)(x)+jax.grad(top_hat)(x)))
 
-mass_matrix = np.eye(n_dim)
-mass_matrix = jax.vmap(mass_diag)(initial_position)
-mass_matrix = jnp.array(mass_matrix).mean(axis=0)
+mass_matrix = jnp.array(np.ones(n_dim))
 mass_matrix = mass_matrix.at[1].set(mass_matrix[1]/1000)
 mass_matrix = mass_matrix.at[5].set(mass_matrix[5]/100)
 mass_matrix = mass_matrix.at[6].set(mass_matrix[6]/10)
+
 
 
 local_sampler = GaussianRandomWalk(
     posterior,
     True,
     {
-        "step_size": step_size,
+        "step_size": step_size*mass_matrix,
     },
 )
 
@@ -184,7 +183,7 @@ nf_sampler.sample(initial_position)
 chains, log_prob, local_accs, global_accs = nf_sampler.get_sampler_state().values()
 
 np.savez(
-    "chains.npz",
+    "chains_gaussian.npz",
     chains=chains,
     log_prob=log_prob,
     local_accs=local_accs,

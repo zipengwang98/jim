@@ -190,7 +190,7 @@ nf_sampler.sample(initial_position)
 chains, log_prob, local_accs, global_accs = nf_sampler.get_sampler_state().values()
 
 np.savez(
-    "chains.npz",
+    "chains_HMC.npz",
     chains=chains,
     log_prob=log_prob,
     local_accs=local_accs,
