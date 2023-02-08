@@ -104,10 +104,11 @@ distmax = args["distmax"]
 # Extrinisic variable
 # Change sampling to be isotropic
 inclination = np.arccos(np.random.uniform(-1.0, 1.0, N))
-polarization_angle = np.arccos(np.random.uniform(-1.0, 1.0, N))
-ran1, ran2 = np.random.random(2 * N).reshape(2, -1)
-ra = 2 * np.pi * (ran1 - 0.5)
-dec = np.arcsin(2.0 * (ran2 - 0.5))
+polarization_angle = np.random.uniform(0.0, 2*jnp.pi, N)
+# Double check these angles
+# ran1, ran2 = np.random.random(2 * N).reshape(2, -1)
+ra = np.random.uniform(0.0, 2*jnp.pi, N)
+dec = jnp.pi/2. - np.arccos(np.random.uniform(-1.0, 1.0, N))
 
 # Finally lets generate section of parameters
 params = np.zeros([N, 11])
@@ -199,13 +200,38 @@ def get_strain_derivatives_V1(theta):
 def calc_SNR(p):
     h0_H1 = get_detector_response(waveform_generator, p, f_list, H1, gmst, epoch)
     h0_L1 = get_detector_response(waveform_generator, p, f_list, L1, gmst, epoch)
-    h0_L1 = get_detector_response(waveform_generator, p, f_list, V1, gmst, epoch)
+    h0_V1 = get_detector_response(waveform_generator, p, f_list, V1, gmst, epoch)
     SNR2_H1 = inner_product(h0_H1, h0_H1, f_list, PSD_vals_H1)
     SNR2_L1 = inner_product(h0_L1, h0_L1, f_list, PSD_vals_L1)
-    SNR2_V1 = inner_product(h0_H1, h0_H1, f_list, PSD_vals_V1)
+    SNR2_V1 = inner_product(h0_V1, h0_V1, f_list, PSD_vals_V1)
 
     return jnp.sqrt(SNR2_H1 + SNR2_L1 + SNR2_V1)
 
+PSD_vals_H1 = jax.numpy.interp(f_list, freqs, psd_list[0])
+PSD_vals_L1 = jax.numpy.interp(f_list, freqs, psd_list[1])
+PSD_vals_V1 = jax.numpy.interp(f_list, freqs, psd_list[2])
+
+#####################################################
+def calc_SNR_test(p):
+    h0_H1 = get_detector_response(waveform_generator, p, f_list, H1, gmst, epoch)
+    h0_L1 = get_detector_response(waveform_generator, p, f_list, L1, gmst, epoch)
+    h0_L1 = get_detector_response(waveform_generator, p, f_list, V1, gmst, epoch)
+    SNR2_H1 = inner_product(h0_H1, h0_H1, f_list, PSD_vals_H1)
+    SNR2_L1 = inner_product(h0_L1, h0_L1, f_list, PSD_vals_L1)
+
+    return jnp.sqrt(SNR2_H1 + SNR2_L1)
+
+m1 = 30
+m2 = 25
+Mc, eta = ms_to_Mc_eta(jnp.array([m1, m2]))
+distance = 1600
+test_params = jnp.array(
+    [Mc, eta, 0.3, -0.4, distance, 0.0, 0.0, np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3]
+)
+
+print(calc_SNR_test(test_params))
+quit()
+#####################################################
 
 Nderivs = 11
 
@@ -245,10 +271,6 @@ def get_Fisher_V1(p):
             )
     return F
 
-
-PSD_vals_H1 = jax.numpy.interp(f_list, freqs, psd_list[0])
-PSD_vals_L1 = jax.numpy.interp(f_list, freqs, psd_list[1])
-PSD_vals_V1 = jax.numpy.interp(f_list, freqs, psd_list[2])
 
 # sky_error_list = []
 

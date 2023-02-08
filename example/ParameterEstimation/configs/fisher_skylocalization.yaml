@@ -14,7 +14,7 @@ ifos:
 
 # Injection parameters
 
-Nt: 2000
+Nt: 1000
 mmin: 20.
 mmax: 60.
 chimin: -0.8

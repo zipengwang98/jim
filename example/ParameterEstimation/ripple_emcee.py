@@ -137,7 +137,7 @@ def posterior(theta):
 
 
 n_dim, n_chains = 7, 30
-nsteps = 100
+nsteps = int(1e3)
 ivar = 1. / np.random.rand(n_dim)
 
 true_params = jnp.array([Mc, eta, 0.3, -0.4])
@@ -153,21 +153,23 @@ initial_position[initial_position[:,1]>0.25,1] = 0.25
 initial_position[initial_position[:,6]<0.,6] = 0.0
 initial_position = jnp.array(initial_position)
 
-sampler = emcee.EnsembleSampler(n_chains, n_dim, posterior)#, args=[ivar])
-sampler.run_mcmc(initial_position, nsteps,  skip_initial_state_check=True, progress=True)
+# sampler = emcee.EnsembleSampler(n_chains, n_dim, posterior)#, args=[ivar])
+# sampler.run_mcmc(initial_position, nsteps,  skip_initial_state_check=True, progress=True)
 
+from multiprocessing import get_context
 
-with Pool() as pool:
+with get_context("fork").Pool() as pool:
     sampler = emcee.EnsembleSampler(n_chains, n_dim, posterior, pool=pool)
-    # start = time.time()
     sampler.run_mcmc(initial_position, nsteps, progress=True, skip_initial_state_check=True)
-    # end = time.time()
-    # multi_time = end - start
-    # print("Multiprocessing took {0:.1f} seconds".format(multi_time))
-    # print("{0:.1f} times faster than serial".format(serial_time / multi_time))
 
-samples = sampler.get_chain(flat=True)
-print(samples, samples.shape)
+# samples = sampler.get_chain(flat=True)
+samples = sampler.get_chain()
+# print(chain.shape)
+
+np.savez(
+    "chains_emcee.npz",
+    chains=samples,
+)
 labels = ["$M_c$", "$\eta$", "$\chi_1$", "$\chi_2$", "D", "$t_c$", "$\phi_c$"]
 
 fig = corner.corner(samples, labels=labels, truths=[Mc, eta, 0.3, -0.4, distance, 0, 0. ])

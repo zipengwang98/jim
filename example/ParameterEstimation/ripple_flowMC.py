@@ -81,9 +81,7 @@ L1_data = L1_noise_psd + L1_signal
 
 def logL(p):
     # Adding on the true ones
-    extrinsic_variables = jnp.array(
-        [np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3]
-    )
+    extrinsic_variables = jnp.array([np.pi / 3, np.pi / 3, np.pi / 3, np.pi / 3])
     params = jnp.concatenate((p, extrinsic_variables))
     logL_H1 = single_detector_likelihood(
         waveform_generator, params, H1_data, f_list, psd_list[0], H1, gmst, epoch
@@ -94,17 +92,19 @@ def logL(p):
 
     return logL_H1 + logL_L1
 
+
 prior_range = jnp.array(
     [
         [10, 80],
         [0.09, 0.25],
         [-1, 1],
         [-1, 1],
-        [400,2000],
+        [400, 2000],
         [-0.1, 0.1],
-        [0, 2*np.pi],
+        [0, 2 * np.pi],
     ]
 )
+
 
 def top_hat(x):
     output = 0.0
@@ -117,16 +117,16 @@ def top_hat(x):
         )
     return output
 
+
 def posterior(theta):
     prior = top_hat(theta)
     return logL(theta) + prior
 
 
-
 n_dim = 7
 n_chains = 30
-n_local_steps = 300
-n_global_steps = 300
+n_local_steps = 2000
+n_global_steps = 2000
 step_size = 0.3
 n_loop_training = 5
 n_loop_production = 5
@@ -136,15 +136,15 @@ true_params = jnp.array([Mc, eta, 0.3, -0.4])
 rng_key_set = initialize_rng_keys(n_chains, seed=41)
 
 initial_noise = jax.random.normal(rng_key_set[0], shape=(n_chains, n_dim)) * 1
-initial_mean = jnp.array([Mc, eta, 0.3, -0.4, distance, 0, 0. ]).reshape(1,7)
-sigma = jnp.array([1, 0.001, 0.1, 0.1, 10, 0.001, 0.01]).reshape(1,7)
+initial_mean = jnp.array([Mc, eta, 0.3, -0.4, distance, 0, 0.0]).reshape(1, 7)
+sigma = jnp.array([1, 0.001, 0.1, 0.1, 10, 0.001, 0.01]).reshape(1, 7)
 
 initial_position = np.array(initial_mean + sigma * initial_noise)
-initial_position[initial_position[:,1]>0.25,1] = 0.25
-initial_position[initial_position[:,6]<0.,6] = 0.0
+initial_position[initial_position[:, 1] > 0.25, 1] = 0.25
+initial_position[initial_position[:, 6] < 0.0, 6] = 0.0
 initial_position = jnp.array(initial_position)
 
-mass_diag = lambda x: jnp.abs(1./(jax.grad(logL)(x)+jax.grad(top_hat)(x)))
+mass_diag = lambda x: jnp.abs(1.0 / (jax.grad(logL)(x) + jax.grad(top_hat)(x)))
 
 mass_matrix = np.eye(n_dim)
 mass_matrix = jax.vmap(mass_diag)(initial_position)
@@ -161,7 +161,9 @@ mass_matrix = jnp.array(mass_matrix).mean(axis=0)
 #     },
 # )
 
-local_sampler = MALA(logL, True, {"step_size": step_size*mass_matrix*jnp.eye(n_dim)})
+local_sampler = MALA(
+    logL, True, {"step_size": step_size * mass_matrix * jnp.eye(n_dim)}
+)
 
 
 model = RQSpline(n_dim, 4, [32, 32], 8)
@@ -185,3 +187,12 @@ nf_sampler = Sampler(
 nf_sampler.sample(initial_position)
 
 chains, log_prob, local_accs, global_accs = nf_sampler.get_sampler_state().values()
+
+np.savez(
+    "ripple_flowMC_results.npz",
+    chains=chains,
+    log_prob=log_prob,
+    local_accs=local_accs,
+    global_accs=global_accs,
+)
+
