@@ -10,7 +10,8 @@ from jimgw.PE.detector_preset import *
 from jimgw.PE.heterodyneLikelihood import make_heterodyne_likelihood_mutliple_detector
 from jimgw.PE.detector_projection import make_detector_response
 
-from flowMC.nfmodel.rqSpline import RQSpline
+from flowMC.nfmodel.rqSpline import MaskedCouplingRQSpline
+from flowMC.nfmodel.common import Gaussian
 from flowMC.sampler.Sampler import Sampler
 from flowMC.sampler.MALA import MALA
 from flowMC.utils.PRNG_keys import initialize_rng_keys
@@ -147,10 +148,7 @@ optimizer = EvolutionaryOptimizer(11, verbose = True)
 state = optimizer.optimize(y, prior_range, n_loops=2000)
 best_fit = optimizer.get_result()[0]
 
-# best_fit = jnp.array([ 3.08772468e+01,  2.49897239e-01,  7.86778181e-01,
-#        -8.99868217e-01,  2.48616122e+02,  2.00861430e-02,
-#         4.68350436e+00,  1.83843946e+00,  2.85302448e+00,
-#         1.07455580e+00, -1.11531886e+00])
+print(best_fit)
 
 data_list = [H1_data, L1_data]
 psd_list = [H1_psd, L1_psd]
@@ -194,7 +192,7 @@ rng_key_set = initialize_rng_keys(n_chains, seed=42)
 print("Initializing MCMC model and normalizing flow model.")
 
 prior_range = jnp.array([[10,80],[0.125,1.0],[-1,1],[-1,1],
-                        [0,2000],[-0.1,0.1],[0,2*np.pi],[-1,1],
+                        [0,2000],[-0.05,0.05],[0,2*np.pi],[-1,1],
                         [0,np.pi],[0,2*np.pi],[-1,1]])
 
 
@@ -223,6 +221,8 @@ def top_hat(x):
 
 def posterior(theta):
     q = theta[1]
+    theta = theta.at[7].set(jnp.arcsin(jnp.sin(theta[7]/2*jnp.pi))*2/jnp.pi)
+    theta = theta.at[10].set(jnp.arcsin(jnp.sin(theta[10]/2*jnp.pi))*2/jnp.pi)
     iota = jnp.arccos(theta[7])
     dec = jnp.arcsin(theta[10])
     prior = top_hat(theta)
@@ -233,7 +233,7 @@ def posterior(theta):
 
 posterior_new = lambda theta, data: posterior(theta)
 
-model = RQSpline(n_dim, 10, [128,128], 8)
+model = MaskedCouplingRQSpline(n_dim, 10, [128,128], 8, jax.random.PRNGKey(10))
 
 print("Initializing sampler class")
 
@@ -261,7 +261,7 @@ nf_sampler = Sampler(
     batch_size=batch_size,
     use_global=True,
     keep_quantile=0.,
-    train_thinning = 40
+    train_thinning = 40,
 )
 
 nf_sampler.sample(initial_position, None)
