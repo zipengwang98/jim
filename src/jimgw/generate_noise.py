@@ -24,7 +24,7 @@ def generate_LVK_PSDdict(ifos: List[str] = ["H1", "L1", "V1"]):
                 f, asd_vals = np.loadtxt("H1.txt", unpack=True)
             psd_vals = asd_vals**2
             psd_dict[ifo] = interpolate.interp1d(
-                f, psd_vals, fill_value=(psd_vals[0], psd_vals[-1])
+                f, psd_vals, fill_value=(0.0, 0.0), bounds_error=False
             )
             continue
         if ifo == "L1":
@@ -38,7 +38,7 @@ def generate_LVK_PSDdict(ifos: List[str] = ["H1", "L1", "V1"]):
                 f, asd_vals = np.loadtxt("L1.txt", unpack=True)
             psd_vals = asd_vals**2
             psd_dict[ifo] = interpolate.interp1d(
-                f, psd_vals, fill_value=(psd_vals[0], psd_vals[-1])
+                f, psd_vals, fill_value=(0.0, 0.0), bounds_error=False
             )
             continue
         if ifo == "V1":
@@ -53,7 +53,7 @@ def generate_LVK_PSDdict(ifos: List[str] = ["H1", "L1", "V1"]):
 
             psd_vals = asd_vals**2
             psd_dict[ifo] = interpolate.interp1d(
-                f, psd_vals, fill_value=(psd_vals[0], psd_vals[-1])
+                f, psd_vals, fill_value=(0.0, 0.0), bounds_error=False
             )
             continue
         else:
@@ -88,6 +88,7 @@ def generate_fd_noise(
     # could just set all values below `fmin` to a constant.
     def pad_low_freqs(f, psd_ref):
         return psd_ref + psd_ref * (f_min - f) * jnp.exp(-(f_min - f)) / 3
+        # return 0.0
 
     psd_dict = {}
     for ifo in psd_funcs.keys():
@@ -138,8 +139,6 @@ def generate_td_noise(
     )
 
     noise_td_dict = {}
-    # FIXME: We still need to add filtering to the frequency domain data
-    # to ensure that the time domain data behaves correctly
     for ifo, psd in noise_fd_dict.items():
         noise_td_dict[ifo] = jnp.fft.irfft(noise_fd_dict[ifo]) * f_sampling
 
