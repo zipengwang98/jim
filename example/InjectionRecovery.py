@@ -3,7 +3,7 @@ from jimgw.detector import H1, L1, V1
 from jimgw.likelihood import TransientLikelihoodFD
 from jimgw.waveform import RippleIMRPhenomD
 from jimgw.prior import Uniform
-from ripple import ms_to_Mc_eta
+from ripple import ms_to_Mc_eta, Mc_eta_to_ms
 import jax.numpy as jnp
 import jax
 from astropy.time import Time
@@ -11,6 +11,9 @@ from astropy.time import Time
 from tap import Tap
 import yaml
 from tqdm import tqdm
+
+from jax import config
+config.update("jax_enable_x64", True)
 
 class InjectionRecoveryParser(Tap):
     config: str 
@@ -56,9 +59,9 @@ class InjectionRecoveryParser(Tap):
 
 args = InjectionRecoveryParser().parse_args()
 
-# opt = vars(args)
-# yaml_var = yaml.load(open(opt['config'], 'r'), Loader=yaml.FullLoader)
-# opt.update(yaml_var)
+opt = vars(args)
+yaml_var = yaml.load(open(opt['config'], 'r'), Loader=yaml.FullLoader)
+opt.update(yaml_var)
 
 # Fetch noise parameters 
 
@@ -78,12 +81,18 @@ post_trigger_duration = 2
 epoch = args.duration - post_trigger_duration
 gmst = Time(trigger_time, format='gps').sidereal_time('apparent', 'greenwich').rad
 
+
+# tc prior hack
+tc_low = args.tc - abs(args.tc) * 0.2
+tc_up = args.tc + abs(args.tc) * 0.2
 waveform = RippleIMRPhenomD(f_ref=f_ref)
 prior = Uniform(
-    xmin = [10, 0.125, -1., -1., 0., -0.05, 0., -1, 0., 0.,-1.],
+    xmin = [10, 0.125, -1., -1., 100., -0.05, 0., -1, 0., 0.,-1.],
     xmax = [80., 1., 1., 1., 2000., 0.05, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
     naming = ["M_c", "q", "s1_z", "s2_z", "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
     transforms = {"q": ("eta", lambda q: q/(1+q)**2),
+                 #"cos_iota": ("iota",lambda cos_iota: jnp.arccos(cos_iota)),
+                 #"sin_dec": ("dec",lambda sin_dec: jnp.arcsin(sin_dec))}
                  "cos_iota": ("iota",lambda cos_iota: jnp.arccos(jnp.arcsin(jnp.sin(cos_iota/2*jnp.pi))*2/jnp.pi)),
                  "sin_dec": ("dec",lambda sin_dec: jnp.arcsin(jnp.arcsin(jnp.sin(sin_dec/2*jnp.pi))*2/jnp.pi))} # sin and arcsin are periodize cos_iota and sin_dec
 )
@@ -99,6 +108,34 @@ key, subkey = jax.random.split(key)
 V1.inject_signal(subkey, freqs, h_sky, detector_param)
 
 likelihood = TransientLikelihoodFD([H1, L1], waveform, trigger_time, args.duration, post_trigger_duration)
+test_param = jnp.array([Mc, 
+                        eta, 
+                        args.chi1, 
+                        args.chi2, 
+                        args.dist_mpc, 
+                        args.tc, 
+                        args.phic, 
+                        args.inclination, 
+                        args.polarization_angle, 
+                        args.ra, 
+                        args.dec])
+max_q = 9.9993967e-1
+max_eta = max_q/(1 + max_q) **2
+maximize_param = jnp.array([1.94841923e1,
+                            max_eta,
+                            -4.6570421e-1,
+                            -4.6607e-1,
+                            6.63507346e+2,
+                            -3.282078e-2,
+                            4.0630425,
+                            2.21078245e-01,
+                            1.161489,
+                            4.342504,
+                            3.3862155e-1])
+log_likelihood = likelihood.evaluate(test_param,{})
+print("log_likelihood:", log_likelihood)
+maximize_likelihood = likelihood.evaluate(maximize_param,{})
+print("log_likelihood:", maximize_likelihood)
 mass_matrix = jnp.eye(11)
 mass_matrix = mass_matrix.at[1,1].set(1e-3)
 mass_matrix = mass_matrix.at[5,5].set(1e-3)
@@ -123,6 +160,11 @@ jim = Jim(likelihood,
         )
 
 sample = jim.maximize_likelihood([prior.xmin, prior.xmax], n_loops=2000)
+print(sample)
 key, subkey = jax.random.split(key)
 jim.sample(subkey)
 samples = jim.get_samples()
+
+chains, log_prob, local_accs, global_accs = jim.Sampler.get_sampler_state().values()
+# print("Script complete and took: {} minutes".format((time.time()-total_time_start)/60))
+jnp.savez(args.output_path + '.npz', chains=chains, log_prob=log_prob, local_accs=local_accs, global_accs=global_accs)
