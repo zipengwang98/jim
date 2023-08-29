@@ -87,8 +87,8 @@ tc_low = args.tc - abs(args.tc) * 0.2
 tc_up = args.tc + abs(args.tc) * 0.2
 waveform = RippleIMRPhenomD(f_ref=f_ref)
 prior = Uniform(
-    xmin = [10, 0.125, -1., -1., 100., -0.05, 0., -1, 0., 0.,-1.],
-    xmax = [80., 1., 1., 1., 2000., 0.05, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
+    xmin = [20, 0.125, -1., -1., 100., tc_low, 0., -1, 0., 0.,-1.],
+    xmax = [80., 1., 1., 1., 1600., tc_up, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
     naming = ["M_c", "q", "s1_z", "s2_z", "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
     transforms = {"q": ("eta", lambda q: q/(1+q)**2),
                  #"cos_iota": ("iota",lambda cos_iota: jnp.arccos(cos_iota)),
@@ -108,7 +108,13 @@ key, subkey = jax.random.split(key)
 V1.inject_signal(subkey, freqs, h_sky, detector_param)
 
 likelihood = TransientLikelihoodFD([H1, L1], waveform, trigger_time, args.duration, post_trigger_duration)
-test_param = jnp.array([Mc, 
+
+#test_param = jnp.array([4.09444581e+01,  2.28985473e-01,  5.71953570e-01, -7.70069604e-01,
+#  1.22731078e+03, -2.22176576e-02,  1.20768179e+00, -1.89423792e-01,
+#  5.90291631e-01,  3.52329394e+00, 7.09614722e-01])
+print(Mc)
+test_param = jnp.array([    
+                        Mc, 
                         eta, 
                         args.chi1, 
                         args.chi2, 
@@ -119,23 +125,30 @@ test_param = jnp.array([Mc,
                         args.polarization_angle, 
                         args.ra, 
                         args.dec])
-max_q = 9.9993967e-1
-max_eta = max_q/(1 + max_q) **2
-maximize_param = jnp.array([1.94841923e1,
-                            max_eta,
-                            -4.6570421e-1,
-                            -4.6607e-1,
-                            6.63507346e+2,
-                            -3.282078e-2,
-                            4.0630425,
-                            2.21078245e-01,
-                            1.161489,
-                            4.342504,
-                            3.3862155e-1])
+#max_q = 9.9993967e-1
+#max_cos_iota = 2.21078245e-01
+#max_sin_dec = 3.3862155e-1
+#
+#max_eta = max_q/(1 + max_q) **2
+#max_iota = jnp.arccos(jnp.arcsin(jnp.sin(max_cos_iota/2*jnp.pi))*2/jnp.pi)
+#max_dec = jnp.arcsin(jnp.arcsin(jnp.sin(max_sin_dec/2*jnp.pi))*2/jnp.pi)
+#maximize_param = jnp.array([1.94841923e1,
+#                            max_eta,
+#                            -4.6570421e-1,
+#                            -4.6607e-1,
+#                            6.63507346e+2,
+#                            -3.282078e-2,
+#                            4.0630425,
+#                            max_iota,
+#                            1.161489,
+#                            4.342504,
+#                            max_dec])
 log_likelihood = likelihood.evaluate(test_param,{})
 print("log_likelihood:", log_likelihood)
-maximize_likelihood = likelihood.evaluate(maximize_param,{})
-print("log_likelihood:", maximize_likelihood)
+#maximize_likelihood = likelihood.evaluate(maximize_param,{})
+#print("log_likelihood:", maximize_likelihood)
+
+
 mass_matrix = jnp.eye(11)
 mass_matrix = mass_matrix.at[1,1].set(1e-3)
 mass_matrix = mass_matrix.at[5,5].set(1e-3)
@@ -164,7 +177,7 @@ print(sample)
 key, subkey = jax.random.split(key)
 jim.sample(subkey)
 samples = jim.get_samples()
-
-chains, log_prob, local_accs, global_accs = jim.Sampler.get_sampler_state().values()
+jim.print_summary()
+chains, log_prob, local_accs, global_accs= jim.Sampler.get_sampler_state().values()
 # print("Script complete and took: {} minutes".format((time.time()-total_time_start)/60))
 jnp.savez(args.output_path + '.npz', chains=chains, log_prob=log_prob, local_accs=local_accs, global_accs=global_accs)

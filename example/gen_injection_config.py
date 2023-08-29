@@ -1,4 +1,8 @@
 import numpy as np
+from jimgw.jim import Jim
+from jimgw.detector import H1, L1, V1
+from jimgw.likelihood import TransientLikelihoodFD
+from astropy.time import Time
 
 def Mc_eta_to_ms(m):
     Mchirp, eta = m
@@ -8,11 +12,11 @@ def Mc_eta_to_ms(m):
     return m1, m2
 
 prior_range = np.array(
-    [[10,50], # mc
+    [[40,80], # mc
      [0.5,1], # q
      [-0.5,0.5], # chi1
      [-0.5,0.5], # chi2
-     [300,2000], # dist_mpc
+     [300,1200], # dist_mpc
      [-0.04,0.04], # tc
      [0,2*np.pi], # phic
      [-1,1], # cos_incl
@@ -39,7 +43,16 @@ ra = np.random.uniform(prior_range[9,0],prior_range[9,1],N_config)
 sin_dec = np.random.uniform(prior_range[10,0],prior_range[10,1],N_config)
 dec = np.arcsin(np.arcsin(np.sin(sin_dec/2*np.pi))*2/np.pi)
 
+duration = 12
 directory = '/home/zwang264/scr4_berti/zipeng/PPE_with_Jax/jim/example/configs/zw_test_batch/'
+
+true_param = np.array([mc, eta, chi1, chi2, dist_mpc, tc, phic, inclination, polarization_angle, ra, dec])
+post_trigger_duration = 2
+trigger_time = 1126259462.4
+epoch = duration - post_trigger_duration
+gmst = Time(trigger_time, format='gps').sidereal_time('apparent', 'greenwich').rad
+detector_param = {"ra": ra, "dec": dec, "gmst": gmst, "psi": polarization_angle, "epoch": epoch, "t_c": tc}
+
 
 for i in range(N_config):
     f = open(directory+"injection_config_"+str(i)+".yaml","w")
@@ -48,7 +61,7 @@ for i in range(N_config):
     f.write('downsample_factor: 10\n')
     f.write('seed: '+str(np.random.randint(low=0,high=10000))+'\n')
     f.write('f_sampling: 2048\n')
-    f.write('duration: 4\n')
+    f.write('duration: ' + str(duration) + '\n')
     f.write('fmin: 30\n')
     f.write('ifos:\n')
     f.write('  - H1\n')
