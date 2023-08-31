@@ -83,18 +83,20 @@ gmst = Time(trigger_time, format='gps').sidereal_time('apparent', 'greenwich').r
 
 
 # tc prior hack
-tc_low = args.tc - abs(args.tc) * 0.2
-tc_up = args.tc + abs(args.tc) * 0.2
+tc_low = args.tc - 0.01
+tc_up = args.tc + 0.01
 waveform = RippleIMRPhenomD(f_ref=f_ref)
 prior = Uniform(
     xmin = [20, 0.125, -1., -1., 100., tc_low, 0., -1, 0., 0.,-1.],
     xmax = [80., 1., 1., 1., 1600., tc_up, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
     naming = ["M_c", "q", "s1_z", "s2_z", "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
-    transforms = {"q": ("eta", lambda q: q/(1+q)**2),
+    transforms = {
+                "q": ("eta", lambda q: q/(1+q)**2),
                  #"cos_iota": ("iota",lambda cos_iota: jnp.arccos(cos_iota)),
                  #"sin_dec": ("dec",lambda sin_dec: jnp.arcsin(sin_dec))}
                  "cos_iota": ("iota",lambda cos_iota: jnp.arccos(jnp.arcsin(jnp.sin(cos_iota/2*jnp.pi))*2/jnp.pi)),
-                 "sin_dec": ("dec",lambda sin_dec: jnp.arcsin(jnp.arcsin(jnp.sin(sin_dec/2*jnp.pi))*2/jnp.pi))} # sin and arcsin are periodize cos_iota and sin_dec
+                 "sin_dec": ("dec",lambda sin_dec: jnp.arcsin(jnp.arcsin(jnp.sin(sin_dec/2*jnp.pi))*2/jnp.pi))
+                 } # sin and arcsin are periodize cos_iota and sin_dec
 )
 true_param = jnp.array([Mc, eta, args.chi1, args.chi2, args.dist_mpc, args.tc, args.phic, args.inclination, args.polarization_angle, args.ra, args.dec])
 true_param = prior.add_name(true_param, with_transform=True)
@@ -109,10 +111,7 @@ V1.inject_signal(subkey, freqs, h_sky, detector_param)
 
 likelihood = TransientLikelihoodFD([H1, L1], waveform, trigger_time, args.duration, post_trigger_duration)
 
-#test_param = jnp.array([4.09444581e+01,  2.28985473e-01,  5.71953570e-01, -7.70069604e-01,
-#  1.22731078e+03, -2.22176576e-02,  1.20768179e+00, -1.89423792e-01,
-#  5.90291631e-01,  3.52329394e+00, 7.09614722e-01])
-print(Mc)
+#print(Mc)
 test_param = jnp.array([    
                         Mc, 
                         eta, 
@@ -180,4 +179,11 @@ samples = jim.get_samples()
 jim.print_summary()
 chains, log_prob, local_accs, global_accs= jim.Sampler.get_sampler_state().values()
 # print("Script complete and took: {} minutes".format((time.time()-total_time_start)/60))
-jnp.savez(args.output_path + '.npz', chains=chains, log_prob=log_prob, local_accs=local_accs, global_accs=global_accs)
+clean_true_param = jnp.array([Mc, args.m2/args.m1, args.chi1, args.chi2, args.dist_mpc, args.tc, args.phic, args.inclination, args.polarization_angle, args.ra, args.dec])
+
+jnp.savez(args.output_path + '.npz', 
+          chains=chains, 
+          log_prob=log_prob, 
+          local_accs=local_accs, 
+          global_accs=global_accs,
+          true_params = clean_true_param )

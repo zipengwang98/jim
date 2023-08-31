@@ -31,9 +31,9 @@ prior_range = np.array(
      [-1,1]] # sin_dec
      )
 
-N_config = 10
+N_config = 100
 
-duration = 12
+duration = 8
 
 gate_keeping_likelihood = 40
 
@@ -42,8 +42,8 @@ freqs = jnp.linspace(30, 2048/2, duration*2048//2)
 
 def test_log_likelihood(true_param,seed):
 
-    tc_low = true_param[5] - abs(true_param[5]) * 0.2
-    tc_up = true_param[5] + abs(true_param[5]) * 0.2
+    tc_low = true_param[5] - 0.01
+    tc_up = true_param[5] + 0.01
     #print(tc_up, tc_low)    
     prior = Uniform(
     xmin = [20, 0.125, -1., -1., 100., tc_low, 0., -1, 0., 0.,-1.],
