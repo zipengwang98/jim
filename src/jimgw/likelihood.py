@@ -82,10 +82,10 @@ class TransientLikelihoodFD(LikelihoodBase):
         log_likelihood = 0
         frequencies = self.detectors[0].frequencies
         df = frequencies[1] - frequencies[0]
-        source_params = {"M_c": params[0], "eta": params[1], "s1_z": params[2], "s2_z": params[3], "d_L": params[4], "t_c": params[5], "phase_c": params[6], "iota": params[7], "psi": params[8], "ra": params[9], "dec": params[10]}
-        detector_params = {"ra": params[9], "dec": params[10], "psi": params[8], "gmst": self.gmst}
+        source_params = {"M_c": params[0], "eta": params[1], "s1_mag": params[2], "s1_theta": params[3], "s1_phi": params[4], "s2_mag": params[5], "s2_theta": params[6], "s2_phi": params[7],"d_L": params[8], "t_c": params[9], "phase_c": params[10], "iota": params[11], "psi": params[12], "ra": params[13], "dec": params[14]}
+        detector_params = {"ra": params[13], "dec": params[14], "psi": params[12], "gmst": self.gmst}
         waveform_sky = self.waveform(frequencies, source_params)
-        align_time = jnp.exp(-1j*2*jnp.pi*frequencies*(self.epoch+params[5]))
+        align_time = jnp.exp(-1j*2*jnp.pi*frequencies*(self.epoch+params[9]))
         for detector in self.detectors:
             waveform_dec = detector.fd_response(frequencies, waveform_sky, detector_params) * align_time
             match_filter_SNR = 4 * jnp.sum((jnp.conj(waveform_dec)*detector.data)/detector.psd*df).real

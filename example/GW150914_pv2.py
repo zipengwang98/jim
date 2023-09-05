@@ -33,18 +33,20 @@ L1.load_data(gps, 2, 2, fmin, fmax, psd_pad=16, tukey_alpha=0.2)
 
 likelihood = TransientLikelihoodFD([H1, L1], RippleIMRPhenomPv2(f_ref = f_ref), gps, 4, 2)
 prior = Uniform(
-    xmin = [10, 0.125, -1., -1., 0., -0.05, 0., -1, 0., 0.,-1.],
-    xmax = [80., 1., 1., 1., 2000., 0.05, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
-    naming = ["M_c", "q", "s1_z", "s2_z", "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
+    xmin = [10, 0.125, 0.,  -1,      0.,  0., -1,        0,        0., -0.05, 0., -1, 0., 0.,-1.],
+    xmax = [80., 1.  , 1.,  1 , 2*jnp.pi, 1.,  1,   2*jnp.pi, 2000., 0.05, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
+    naming = ["M_c", "q", "s1_mag", "s1_cos_theta", "s1_phi", "s2_mag", "s2_cos_theta",  "s2_phi",  "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
     transforms = {"q": ("eta", lambda q: q/(1+q)**2),
-                 "iota": ("iota",lambda cos_iota: jnp.arccos(jnp.arcsin(jnp.sin(cos_iota/2*jnp.pi))*2/jnp.pi)),
-                 "dec": ("dec",lambda sin_dec: jnp.arcsin(jnp.arcsin(jnp.sin(sin_dec/2*jnp.pi))*2/jnp.pi))
+                 "cos_iota": ("iota",lambda cos_iota: jnp.arccos(jnp.arcsin(jnp.sin(cos_iota/2*jnp.pi))*2/jnp.pi)),
+                 "sin_dec": ("dec",lambda sin_dec: jnp.arcsin(jnp.arcsin(jnp.sin(sin_dec/2*jnp.pi))*2/jnp.pi)),
+                 "s1_cos_theta": ("s1_theta",lambda s1_cos_theta: jnp.arccos(jnp.arcsin(jnp.sin(s1_cos_theta/2*jnp.pi))*2/jnp.pi)),
+                 "s2_cos_theta": ("s2_theta",lambda s2_cos_theta: jnp.arccos(jnp.arcsin(jnp.sin(s2_cos_theta/2*jnp.pi))*2/jnp.pi))
                  } # sin and arcsin are periodize cos_iota and sin_dec
 )
 
-mass_matrix = jnp.eye(11)
+mass_matrix = jnp.eye(15)
 mass_matrix = mass_matrix.at[1,1].set(1e-3)
-mass_matrix = mass_matrix.at[5,5].set(1e-3)
+mass_matrix = mass_matrix.at[9,9].set(1e-3)
 local_sampler_arg = {"step_size": mass_matrix*3e-3}
 
 jim = Jim(likelihood, 
@@ -53,7 +55,7 @@ jim = Jim(likelihood,
         n_loop_production = 10,
         n_local_steps=300,
         n_global_steps=300,
-        n_chains=500,
+        n_chains=300,
         n_epochs=300,
         learning_rate = 0.001,
         momentum = 0.9,

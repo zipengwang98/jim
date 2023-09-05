@@ -38,8 +38,8 @@ class RippleIMRPhenomPv2(Waveform):
 
     def __call__(self, frequency: Array, params: dict) -> Array:
         output = {}
-        theta = [params['M_c'], params['eta'], 0.0, 0.0, params['s1_z'],
-                 0.0, 0.0, params['s2_z'],
+        theta = [params['M_c'], params['eta'], params['s1_mag'], params['s1_theta'], params['s1_phi'], params['s2_mag'],
+                 params['s1_theta'], params['s2_phi'],
                  params['d_L'], 0, params['phase_c'], params['iota']]
         hp, hc = gen_IMRPhenomPv2_hphc(frequency, theta, self.f_ref)
         output['p'] = hp
