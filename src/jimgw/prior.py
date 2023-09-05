@@ -10,6 +10,9 @@ class Prior(Distribution):
     A thin wrapper build on top of flowMC distributions to do book keeping.
 
     Should not be used directly since it does not implement any of the real method.
+
+    The rationale behind this is to have a class that can be used to keep track of
+    the names of the parameters and the transforms that are applied to them.
     """
 
     naming: list[str]
@@ -31,12 +34,16 @@ class Prior(Distribution):
             of the transform and the transform itself.
         """
         self.naming = naming
-        self.transforms = []
+        self.transforms = {}
+
+        def make_lambda(name):
+                return lambda x: x[name]
+
         for name in naming:
             if name in transforms:
-                self.transforms.append(transforms[name])
+                self.transforms[name] = transforms[name]
             else:
-                self.transforms.append((name,lambda x: x))
+                self.transforms[name] = (name, make_lambda(name)) # Without the function, the lambda will refer to the variable name instead of its value, which will make lambda reference the last value of the variable name
 
     def transform(self, x: Array) -> Array:
         """
@@ -44,30 +51,33 @@ class Prior(Distribution):
 
         Parameters
         ----------
-        x : Array
-            The parameters to transform.
+        x : dict
+            A dictionary of parameters. Names should match the ones in the prior.
 
         Returns
         -------
-        x : Array
-            The transformed parameters.
+        x : dict
+            A dictionary of parameters with the transforms applied.
         """
-        for i,transform in enumerate(self.transforms):
-            x = x.at[i].set(transform[1](x[i]))
+        output = self.add_name(x, transform_name = False, transform_value = False)
+        for i, (key, value) in enumerate(self.transforms.items()):
+            x = x.at[i].set(value[1](output))
         return x
 
-    def add_name(self, x: Array, with_transform: bool = False) -> dict:
+    def add_name(self, x: Array, transform_name: bool = False, transform_value: bool = False) -> dict:
         """
         Turn an array into a dictionary
         """
-        if with_transform:
-            naming = []
-            for i,transform in enumerate(self.transforms):
-                naming.append(transform[0])
+        if transform_name:
+            naming = [value[0] for value in self.transforms.values()]
         else:
             naming = self.naming
-        return dict(zip(naming, x))
-
+        if transform_value:
+            x = self.transform(x)
+            value = x
+        else:
+            value = x
+        return dict(zip(naming,value))
 
 class Uniform(Prior):
 

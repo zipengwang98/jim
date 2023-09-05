@@ -41,6 +41,7 @@ inclination = np.arccos(np.arcsin(np.sin(cos_inclination/2*np.pi))*2/np.pi)
 polarization_angle = np.random.uniform(prior_range[8,0],prior_range[8,1],N_config)
 ra = np.random.uniform(prior_range[9,0],prior_range[9,1],N_config)
 sin_dec = np.random.uniform(prior_range[10,0],prior_range[10,1],N_config)
+#dec = np.arcsin(sin_dec)
 dec = np.arcsin(np.arcsin(np.sin(sin_dec/2*np.pi))*2/np.pi)
 
 duration = 12

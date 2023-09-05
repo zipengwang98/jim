@@ -1,7 +1,7 @@
 from jimgw.jim import Jim
 from jimgw.detector import H1, L1, V1
-from jimgw.likelihood import TransientLikelihoodFD
-from jimgw.waveform import RippleIMRPhenomD
+from jimgw.likelihood import HeterodynedTransientLikelihoodFD, TransientLikelihoodFD
+from jimgw.waveform import RippleIMRPhenomPv2
 from jimgw.prior import Uniform
 from ripple import ms_to_Mc_eta, Mc_eta_to_ms
 import jax.numpy as jnp
@@ -12,56 +12,59 @@ from tap import Tap
 import yaml
 from tqdm import tqdm
 
-from jax import config
-config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", True)
+
 
 class InjectionRecoveryParser(Tap):
     config: str 
     
     # Noise parameters
-    seed: int = None
-    f_sampling: int  = None
-    duration: int = None
-    fmin: float = None
-    ifos: list[str]  = None
+    seed: int = 0
+    f_sampling: int  = 2048
+    duration: int = 4
+    fmin: float = 20.0
+    ifos: list[str]  = ["H1", "L1", "V1"]
 
     # Injection parameters
-    m1: float = None
-    m2: float = None
-    chi1: float = None
-    chi2: float = None
-    dist_mpc: float = None
-    tc: float = None
-    phic: float = None
-    inclination: float = None
-    polarization_angle: float = None
-    ra: float = None
-    dec: float = None
+    m1: float = 30.0
+    m2: float = 29.0
+    s1_theta: float = 0.
+    s1_phi: float = 0.
+    s1_mag: float = 0.
+    s2_theta: float = 0.
+    s2_phi: float = 0.
+    s2_mag: float = 0.
+    dist_mpc: float = 400.
+    tc: float = 0.
+    phic: float = 0.
+    inclination: float = 0.3
+    polarization_angle: float = 0.7
+    ra: float = 1.1
+    dec: float = 0.3
 
     # Sampler parameters
-    n_dim: int = None
-    n_chains: int = None
-    n_loop_training: int = None
-    n_loop_production: int = None
-    n_local_steps: int = None
-    n_global_steps: int = None
-    learning_rate: float = None
-    max_samples: int = None
-    momentum: float = None
-    num_epochs: int = None
-    batch_size: int = None
-    stepsize: float = None
+    n_dim: int = 15
+    n_chains: int = 500
+    n_loop_training: int = 20
+    n_loop_production: int = 10
+    n_local_steps: int = 200
+    n_global_steps: int = 200
+    learning_rate: float = 0.001
+    max_samples: int = 50000
+    momentum: float = 0.9
+    num_epochs: int = 300
+    batch_size: int = 50000
+    stepsize: float = 0.01
+    use_global: bool = True
+    keep_quantile: float = 0.0
+    train_thinning: int = 40
 
     # Output parameters
-    output_path: str = None
-    downsample_factor: int = None
+    output_path: str = "./"
+    downsample_factor: int = 10
 
 
 args = InjectionRecoveryParser().parse_args()
-
-opt = vars(args)
-yaml_var = yaml.load(open(opt['config'], 'r'), Loader=yaml.FullLoader)
-opt.update(yaml_var)
 
 # Fetch noise parameters 
 
@@ -81,25 +84,23 @@ post_trigger_duration = 2
 epoch = args.duration - post_trigger_duration
 gmst = Time(trigger_time, format='gps').sidereal_time('apparent', 'greenwich').rad
 
-
-# tc prior hack
-tc_low = args.tc - 0.01
-tc_up = args.tc + 0.01
-waveform = RippleIMRPhenomD(f_ref=f_ref)
+waveform = RippleIMRPhenomPv2(f_ref=f_ref)
 prior = Uniform(
-    xmin = [20, 0.125, -1., -1., 100., tc_low, 0., -1, 0., 0.,-1.],
-    xmax = [80., 1., 1., 1., 1600., tc_up, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
-    naming = ["M_c", "q", "s1_z", "s2_z", "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
-    transforms = {
-                "q": ("eta", lambda q: q/(1+q)**2),
-                 #"cos_iota": ("iota",lambda cos_iota: jnp.arccos(cos_iota)),
-                 #"sin_dec": ("dec",lambda sin_dec: jnp.arcsin(sin_dec))}
-                 "cos_iota": ("iota",lambda cos_iota: jnp.arccos(jnp.arcsin(jnp.sin(cos_iota/2*jnp.pi))*2/jnp.pi)),
-                 "sin_dec": ("dec",lambda sin_dec: jnp.arcsin(jnp.arcsin(jnp.sin(sin_dec/2*jnp.pi))*2/jnp.pi))
-                 } # sin and arcsin are periodize cos_iota and sin_dec
+    xmin = [10, 0.125, 0, 0, 0, 0, 0, 0, 0., -0.05, 0., -1, 0., 0.,-1.],
+    xmax = [80., 1., jnp.pi, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1., 2000., 0.05, 2*jnp.pi, 1., jnp.pi, 2*jnp.pi, 1.],
+    naming = ["M_c", "q", "s1_theta", "s1_phi", "s1_mag", "s2_theta", "s2_phi", "s2_mag", "d_L", "t_c", "phase_c", "cos_iota", "psi", "ra", "sin_dec"],
+    transforms = {"q": ("eta", lambda params: params['q']/(1+params['q'])**2),
+                 "s1_theta": ("s1_x", lambda params: jnp.sin(params['s1_theta'])*jnp.cos(params['s1_phi'])*params['s1_mag']),
+                 "s1_phi": ("s1_y", lambda params: jnp.sin(params['s1_theta'])*jnp.sin(params['s1_phi'])*params['s1_mag']),
+                 "s1_mag": ("s1_z", lambda params: jnp.cos(params['s1_theta'])*params['s1_mag']),
+                 "s2_theta": ("s2_x", lambda params: jnp.sin(params['s2_theta'])*jnp.cos(params['s2_phi'])*params['s2_mag']),
+                 "s2_phi": ("s2_y", lambda params: jnp.sin(params['s2_theta'])*jnp.sin(params['s2_phi'])*params['s2_mag']),
+                 "s2_mag": ("s2_z", lambda params: jnp.cos(params['s2_theta'])*params['s2_mag']),
+                 "cos_iota": ("iota",lambda params: jnp.arccos(jnp.arcsin(jnp.sin(params['cos_iota']/2*jnp.pi))*2/jnp.pi)),
+                 "sin_dec": ("dec",lambda params: jnp.arcsin(jnp.arcsin(jnp.sin(params['sin_dec']/2*jnp.pi))*2/jnp.pi))} # sin and arcsin are periodize cos_iota and sin_dec
 )
-true_param = jnp.array([Mc, eta, args.chi1, args.chi2, args.dist_mpc, args.tc, args.phic, args.inclination, args.polarization_angle, args.ra, args.dec])
-true_param = prior.add_name(true_param, with_transform=True)
+true_param = jnp.array([Mc, args.m2/args.m1, args.s1_theta, args.s1_phi, args.s1_mag, args.s2_theta, args.s2_phi, args.s2_mag, args.dist_mpc, args.tc, args.phic, args.inclination, args.polarization_angle, args.ra, args.dec])
+true_param = prior.add_name(true_param, transform_name = True, transform_value = True)
 detector_param = {"ra": args.ra, "dec": args.dec, "gmst": gmst, "psi": args.polarization_angle, "epoch": epoch, "t_c": args.tc}
 h_sky = waveform(freqs, true_param)
 key, subkey = jax.random.split(jax.random.PRNGKey(args.seed+1234))
@@ -109,64 +110,28 @@ L1.inject_signal(subkey, freqs, h_sky, detector_param)
 key, subkey = jax.random.split(key)
 V1.inject_signal(subkey, freqs, h_sky, detector_param)
 
-likelihood = TransientLikelihoodFD([H1, L1], waveform, trigger_time, args.duration, post_trigger_duration)
+likelihood = TransientLikelihoodFD([H1, L1, V1], waveform, trigger_time, args.duration, post_trigger_duration)
+# likelihood = HeterodynedTransientLikelihoodFD([H1, L1, V1], prior=prior, bounds=[prior.xmin, prior.xmax],  waveform = waveform, trigger_time = trigger_time, duration = args.duration, post_trigger_duration = post_trigger_duration)
 
-#print(Mc)
-test_param = jnp.array([    
-                        Mc, 
-                        eta, 
-                        args.chi1, 
-                        args.chi2, 
-                        args.dist_mpc, 
-                        args.tc, 
-                        args.phic, 
-                        args.inclination, 
-                        args.polarization_angle, 
-                        args.ra, 
-                        args.dec])
-#max_q = 9.9993967e-1
-#max_cos_iota = 2.21078245e-01
-#max_sin_dec = 3.3862155e-1
-#
-#max_eta = max_q/(1 + max_q) **2
-#max_iota = jnp.arccos(jnp.arcsin(jnp.sin(max_cos_iota/2*jnp.pi))*2/jnp.pi)
-#max_dec = jnp.arcsin(jnp.arcsin(jnp.sin(max_sin_dec/2*jnp.pi))*2/jnp.pi)
-#maximize_param = jnp.array([1.94841923e1,
-#                            max_eta,
-#                            -4.6570421e-1,
-#                            -4.6607e-1,
-#                            6.63507346e+2,
-#                            -3.282078e-2,
-#                            4.0630425,
-#                            max_iota,
-#                            1.161489,
-#                            4.342504,
-#                            max_dec])
-log_likelihood = likelihood.evaluate(test_param,{})
-print("log_likelihood:", log_likelihood)
-#maximize_likelihood = likelihood.evaluate(maximize_param,{})
-#print("log_likelihood:", maximize_likelihood)
-
-
-mass_matrix = jnp.eye(11)
+mass_matrix = jnp.eye(args.n_dim)
 mass_matrix = mass_matrix.at[1,1].set(1e-3)
-mass_matrix = mass_matrix.at[5,5].set(1e-3)
-local_sampler_arg = {"step_size": mass_matrix*3e-3}
+mass_matrix = mass_matrix.at[9,9].set(1e-3)
+local_sampler_arg = {"step_size": mass_matrix*3e-4}
 
 jim = Jim(likelihood, 
         prior,
-        n_loop_training=10,
-        n_loop_production = 10,
-        n_local_steps=300,
-        n_global_steps=300,
-        n_chains=500,
-        n_epochs=300,
-        learning_rate = 0.001,
-        momentum = 0.9,
-        batch_size = 50000,
-        use_global=True,
-        keep_quantile=0.,
-        train_thinning = 40,
+        n_loop_training=args.n_loop_training,
+        n_loop_production = args.n_loop_production,
+        n_local_steps=args.n_local_steps,
+        n_global_steps=args.n_global_steps,
+        n_chains=args.n_chains,
+        n_epochs=args.num_epochs,
+        learning_rate = args.learning_rate,
+        momentum = args.momentum,
+        batch_size = args.batch_size,
+        use_global=args.use_global,
+        keep_quantile= args.keep_quantile,
+        train_thinning = args.train_thinning,
         local_sampler_arg = local_sampler_arg,
         seed = args.seed,
         )
