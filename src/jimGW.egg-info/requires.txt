@@ -1,0 +1,8 @@
+jax>=0.4.12
+jaxlib>=0.4.12
+flowMC>=0.2.1
+ripplegw
+gwpy
+corner
+astropy
+typed-argument-parser
