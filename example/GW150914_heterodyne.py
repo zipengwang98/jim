@@ -86,7 +86,9 @@ prior = Composite(
     ]
 )
 
-bounds = jnp.array([[10.0, 80.0], [0.125, 1.0], [-1.0, 1.0], [-1.0, 1.0], [0.0, 2000.0], [-0.05, 0.05], [0.0, 2 * jnp.pi], [-1.0, 1.0], [0.0, jnp.pi], [0.0, 2 * jnp.pi], [-1.0, 1.0]]).T
+# The following only works if every prior has xmin and xmax property, which is OK for Uniform and Powerlaw
+bounds = jnp.array([[p.xmin, p.xmax] for p in prior.priors])
+#bounds = jnp.array([[10.0, 80.0], [0.125, 1.0], [-1.0, 1.0], [-1.0, 1.0], [0.0, 2000.0], [-0.05, 0.05], [0.0, 2 * jnp.pi], [-1.0, 1.0], [0.0, jnp.pi], [0.0, 2 * jnp.pi], [-1.0, 1.0]]).T
 
 likelihood = HeterodynedTransientLikelihoodFD(
     [H1, L1],
@@ -107,10 +109,10 @@ local_sampler_arg = {"step_size": mass_matrix * 3e-3}
 jim = Jim(
     likelihood,
     prior,
-    n_loop_training=100,
+    n_loop_training=400,
     n_loop_production=10,
-    n_local_steps=150,
-    n_global_steps=150,
+    n_local_steps=250,
+    n_global_steps=250,
     n_chains=500,
     n_epochs=50,
     learning_rate=0.001,
@@ -125,3 +127,11 @@ jim = Jim(
 )
 
 jim.sample(jax.random.PRNGKey(42))
+chains, log_prob, local_accs, global_accs= jim.Sampler.get_sampler_state(training=False).values()
+outdir_name = "./outdir/"
+
+jnp.savez(outdir_name + 'GW150914_heterodyne.npz', 
+          chains=chains, 
+          log_prob=log_prob, 
+          local_accs=local_accs, 
+          global_accs=global_accs)

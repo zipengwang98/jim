@@ -119,3 +119,11 @@ jim = Jim(
 )
 
 jim.sample(jax.random.PRNGKey(42))
+outdir_name = "./outdir/"
+
+chains, log_prob, local_accs, global_accs,= jim.Sampler.get_sampler_state(training=False).values()
+jnp.savez(outdir_name + 'GW150914_PV2.npz', 
+          chains=chains, 
+          log_prob=log_prob, 
+          local_accs=local_accs, 
+          global_accs=global_accs,)
