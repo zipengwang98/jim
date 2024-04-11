@@ -273,7 +273,8 @@ class Sphere(Prior):
             | (theta > jnp.pi)
             | (theta < 0),
             jnp.zeros_like(0) - jnp.inf,
-            jnp.log(mag**2 * jnp.sin(x[self.naming[0]])),
+            1.0,
+            #jnp.log(mag**2 * jnp.sin(x[self.naming[0]])),
         )
         return output
 
